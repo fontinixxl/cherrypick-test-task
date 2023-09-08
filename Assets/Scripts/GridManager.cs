@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 
 namespace Gerard.CherrypickGames
 {
@@ -13,15 +15,18 @@ namespace Gerard.CherrypickGames
         public int Width { get; private set; }
         public int Height { get; private set; }
 
+        private SpawnerController _spawnController;
+        private Vector2Int _startingPosition;
+
         private void Start()
         {
-            if (LoadGridConfig())
-            {
-                GenerateGrid();
-                SpawnSpawner();
-            }
-        }
+            if (!LoadGridConfig()) return;
 
+            GenerateGrid();
+            SpawnSpawnerItem();
+            var spiralPosOrder = GenerateAntiClockWiseOrderedGridPositionsList();
+            StartCoroutine(ColorGridInSpiralOrderClockWise(spiralPosOrder));
+        }
 
         private bool LoadGridConfig()
         {
@@ -45,7 +50,7 @@ namespace Gerard.CherrypickGames
             XOffset = Width * 0.5f - 0.5f;
             YOffset = Height * 0.5f - 0.5f;
 
-            Vector2Int centerCoordinates = GetGridCenterCoordinates();
+            var centerCoordinates = GetCenterCoordinates();
             for (var i = 0; i < Height; i++)
             {
                 for (var j = 0; j < Width; j++)
@@ -54,24 +59,76 @@ namespace Gerard.CherrypickGames
                     var cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity, transform)
                         .GetComponent<Cell>();
 
-                    // If we are NOT on the center cell, 25% chance of making the cell blocked
+                    // If we are NOT on the center cell, 25% chance the cell will be blocked
                     var isBlocked = (j != centerCoordinates.x || i != centerCoordinates.y) && Random.value < .25f;
                     cell.Initialize(new Vector2Int(j, i), isBlocked);
-                    
+
                     Cells[j, i] = cell;
                 }
             }
         }
 
-        private void SpawnSpawner()
+        // Based on the Width and Height of a two dimensional grid, this method will generate
+        // a list containing the grid coordinates ordered following an anti-clock wise pattern
+        // Algorithm based on the following article:
+        // https://javaconceptoftheday.com/how-to-create-spiral-of-numbers-matrix-in-java/
+        private List<Vector2Int> GenerateAntiClockWiseOrderedGridPositionsList()
         {
-            var middleCoord = GetGridCenterCoordinates();
-            var cell = Cells[middleCoord.x, middleCoord.y];
-            var middleCellTransform = cell.GetComponent<Transform>();
-            Instantiate(spawnerPrefab, middleCellTransform.position, Quaternion.identity);
+            var positions = new List<Vector2Int>();
+
+            var value = 1;
+            var minCol = 0;
+            var maxCol = Width - 1;
+            var minRow = 0;
+            var maxRow = Height - 1;
+
+            while (value <= Width * Height)
+            {
+                for (var i = minRow; i <= maxRow; i++)
+                {
+                    positions.Add(new Vector2Int(minCol, i));
+                    value++;
+                }
+
+                for (var i = minCol + 1; i <= maxCol; i++)
+                {
+                    positions.Add(new Vector2Int(i, maxRow));
+                    value++;
+                }
+
+                for (var i = maxRow - 1; i >= minRow; i--)
+                {
+                    positions.Add(new Vector2Int(maxCol, i));
+                    value++;
+                }
+
+                for (var i = maxCol - 1; i >= minCol + 1; i--)
+                {
+                    positions.Add(new Vector2Int(i, minRow));
+                    value++;
+                }
+
+                minCol++;
+                minRow++;
+                maxCol--;
+                maxRow--;
+            }
+
+            return positions;
         }
 
-        private Vector2Int GetGridCenterCoordinates()
+        private void SpawnSpawnerItem()
+        {
+            _startingPosition = GetCenterCoordinates();
+            var worldPosition = GetWorldPositionFromCell(_startingPosition);
+            var spawnedGo = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity);
+            _spawnController = spawnedGo.GetComponent<SpawnerController>();
+
+            // Inject dependencies to the SpawnController
+            _spawnController.Initialize(this, _startingPosition);
+        }
+
+        private Vector2Int GetCenterCoordinates()
         {
             int centerX = Width / 2;
             int centerY = Height / 2;
@@ -87,6 +144,46 @@ namespace Gerard.CherrypickGames
             }
 
             return centerCoordinates;
+        }
+
+        # region Helpers
+
+        public Cell GetCell(Vector2Int gridPos) => Cells[gridPos.x, Height - 1 - gridPos.y];
+
+        public Vector3 GetWorldPositionFromCell(Vector2Int gridPos)
+        {
+            return GetCell(gridPos).GetComponent<Transform>().position;
+        }
+
+        public bool IsCellWithinBounds(Vector2Int cellPos)
+        {
+            return cellPos.x >= 0 && cellPos.x < Width && cellPos.y >= 0 && cellPos.y < Height;
+        }
+
+        public bool IsCellEmpty(Vector2Int cellPos)
+        {
+            return GetCell(cellPos).IsCellEmpty;
+        }
+
+        public bool IsValidPosition(Vector2Int cellPos)
+        {
+            return IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
+        }
+
+        #endregion
+
+        private IEnumerator ColorGridInSpiralOrderClockWise(List<Vector2Int> antiClockWiseOrderedPositions)
+        {
+            for (var i = antiClockWiseOrderedPositions.Count - 1; i >= 0; i--)
+            {
+                var cellPosition = antiClockWiseOrderedPositions[i];
+                if (IsValidPosition(cellPosition))
+                {
+                    var cell = GetCell(cellPosition);
+                    cell.SetColor(Color.yellow);
+                    yield return new WaitForSeconds(0.5f);
+                }
+            }
         }
     }
 

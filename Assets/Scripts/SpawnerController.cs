@@ -1,14 +1,32 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace Gerard.CherrypickGames
 {
     public class SpawnerController : MonoBehaviour
     {
+        [SerializeField] private GameObject itemPrefab;
+
+        [SerializeField] private List<Color> possibleColors = new()
+        {
+            Color.blue,
+            Color.red,
+            Color.green
+        };
+
         private GridManager _gridManager;
         private bool _isDragging;
         private Camera _mainCamera;
         private Collider2D _collider2D;
         private Vector3 _originalPositionBeforeDrag;
+
+        private Vector2Int _currentGridPos;
+
+        public void Initialize(GridManager gridManager, Vector2Int initialGridPosition)
+        {
+            _gridManager = gridManager;
+            _currentGridPos = initialGridPosition;
+        }
 
         private void Awake()
         {
@@ -16,16 +34,20 @@ namespace Gerard.CherrypickGames
             _collider2D = GetComponent<Collider2D>();
         }
 
-        private void Start()
-        {
-            // This is not so efficient, but for this particular case,
-            // this will only run once in whole lifecycle
-            _gridManager = FindObjectOfType<GridManager>();
-        }
-
         private void Update()
         {
+            if (_gridManager == null) return;
+
             HandleDrag();
+        }
+
+        private void SpawnItemAt(Vector2Int cellPos)
+        {
+            var randomColor = possibleColors[Random.Range(0, possibleColors.Count)];
+            var newItem = Instantiate(itemPrefab, _gridManager.GetWorldPositionFromCell(cellPos), Quaternion.identity);
+            var spriteRenderer = newItem.GetComponent<SpriteRenderer>();
+            spriteRenderer.color = randomColor;
+            _gridManager.GetCell(cellPos).IsCellEmpty = false;
         }
 
         private void HandleDrag()

@@ -6,22 +6,31 @@ namespace Gerard.CherrypickGames
     {
         public bool IsBlocked { get; private set; }
         public Vector2Int GridPosition { get; private set; }
+        public bool IsCellEmpty { get; set; }
+
+        private SpriteRenderer _spriteRenderer;
+
+        private void Awake()
+        {
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+        }
 
         public void Initialize(Vector2Int gridPosition, bool isBlocked)
         {
             GridPosition = gridPosition;
             IsBlocked = isBlocked;
-            
-            // Update grid color based on state
-            var spriteRenderer = GetComponent<SpriteRenderer>();
+
             if (isBlocked)
             {
-                spriteRenderer.color = Color.black;
+                _spriteRenderer.color = Color.black;
             }
             else
             {
-                spriteRenderer.color = (GridPosition.x + GridPosition.y) % 2 == 0 ? Color.white : Color.gray;
+                IsCellEmpty = true;
+                _spriteRenderer.color = (GridPosition.x + GridPosition.y) % 2 == 0 ? Color.white : Color.gray;
             }
         }
+
+        public void SetColor(Color color) => _spriteRenderer.color = color;
     }
 }
