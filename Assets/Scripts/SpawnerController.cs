@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Gerard.CherrypickGames
@@ -21,6 +22,7 @@ namespace Gerard.CherrypickGames
         private Vector3 _originalPositionBeforeDrag;
 
         private Vector2Int _currentGridPos;
+        private bool _isSpawning = false;
 
         public void Initialize(GridManager gridManager, Vector2Int initialGridPosition)
         {
@@ -38,9 +40,58 @@ namespace Gerard.CherrypickGames
         {
             if (_gridManager == null) return;
 
-            HandleDrag();
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                _isSpawning = !_isSpawning;
+            }
+
+            if (_isSpawning)
+            {
+                SpawnColoredItems();
+            }
+            else
+            {
+                HandleDrag();
+            }
         }
 
+        private void SpawnColoredItems()
+        {
+            if (_gridManager.OrderedStack == null || _gridManager.OrderedStack.Count == 0) return;
+
+            while (_gridManager.OrderedStack.Count > 0)
+            {
+                var targetGridPosition = _gridManager.OrderedStack.Pop();
+                if (_gridManager.IsValidPosition(targetGridPosition))
+                {
+                    var targetPosition = _gridManager.GetCell(targetGridPosition).transform.position;
+                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridManager.transform);
+                    item.GetComponent<SpriteRenderer>().color = possibleColors[Random.Range(0, possibleColors.Count)];
+
+                    // Start animation coroutine
+                    StartCoroutine(MoveToPosition(item.transform, targetPosition, .1f));
+                    return;
+                }
+            }
+
+            _isSpawning = false;
+        }
+
+        private IEnumerator MoveToPosition(Transform itemTransform, Vector3 targetPosition, float duration)
+        {
+            var startPosition = itemTransform.position;
+            float elapsed = 0;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float normalizedTime = elapsed / duration; // value between 0 and 1
+                itemTransform.position = Vector3.Lerp(startPosition, targetPosition, normalizedTime);
+                yield return null;
+            }
+
+            itemTransform.position = targetPosition; // ensure the item reaches the exact target position
+        }
 
         private void HandleDrag()
         {
@@ -54,8 +105,8 @@ namespace Gerard.CherrypickGames
                 }
             }
 
-            if (Input.GetMouseButtonUp(0))
-            {   
+            if (Input.GetMouseButtonUp(0) && _isDragging)
+            {
                 _isDragging = false;
                 SnapToCell(mouseWorldPosition);
             }

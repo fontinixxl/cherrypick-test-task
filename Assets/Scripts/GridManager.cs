@@ -14,6 +14,7 @@ namespace Gerard.CherrypickGames
         public float YOffset { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
+        public Stack<Vector2Int> OrderedStack { get; private set; }
 
         private SpawnerController _spawnController;
         private Vector2Int _startingPosition;
@@ -23,9 +24,9 @@ namespace Gerard.CherrypickGames
             if (!LoadGridConfig()) return;
 
             GenerateGrid();
+            GenerateClockWiseOrderedGridPositionsList();
+            // StartCoroutine(ColorGridInSpiralOrderStack());
             SpawnSpawnerItem();
-            var spiralPosOrder = GenerateAntiClockWiseOrderedGridPositionsList();
-            StartCoroutine(ColorGridInSpiralOrderClockWise(spiralPosOrder));
         }
 
         private bool LoadGridConfig()
@@ -75,10 +76,9 @@ namespace Gerard.CherrypickGames
         // a list containing the grid coordinates ordered following an anti-clock wise pattern
         // Algorithm based on the following article:
         // https://javaconceptoftheday.com/how-to-create-spiral-of-numbers-matrix-in-java/
-        private List<Vector2Int> GenerateAntiClockWiseOrderedGridPositionsList()
+        private void GenerateClockWiseOrderedGridPositionsList()
         {
-            var positions = new List<Vector2Int>();
-
+            OrderedStack = new Stack<Vector2Int>(Width * Height);
             var value = 1;
             var minCol = 0;
             var maxCol = Width - 1;
@@ -89,25 +89,25 @@ namespace Gerard.CherrypickGames
             {
                 for (var i = minRow; i <= maxRow; i++)
                 {
-                    positions.Add(new Vector2Int(minCol, i));
+                    OrderedStack.Push(new Vector2Int(minCol, i));
                     value++;
                 }
 
                 for (var i = minCol + 1; i <= maxCol; i++)
                 {
-                    positions.Add(new Vector2Int(i, maxRow));
+                    OrderedStack.Push(new Vector2Int(i, maxRow));
                     value++;
                 }
 
                 for (var i = maxRow - 1; i >= minRow; i--)
                 {
-                    positions.Add(new Vector2Int(maxCol, i));
+                    OrderedStack.Push(new Vector2Int(maxCol, i));
                     value++;
                 }
 
                 for (var i = maxCol - 1; i >= minCol + 1; i--)
                 {
-                    positions.Add(new Vector2Int(i, minRow));
+                    OrderedStack.Push(new Vector2Int(i, minRow));
                     value++;
                 }
 
@@ -117,7 +117,8 @@ namespace Gerard.CherrypickGames
                 maxRow--;
             }
 
-            return positions;
+            // Discard the first one since is where the spawner is
+            OrderedStack.Pop();
         }
 
         private void SpawnSpawnerItem()
@@ -173,16 +174,16 @@ namespace Gerard.CherrypickGames
             return IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
         }
 
-        private IEnumerator ColorGridInSpiralOrderClockWise(List<Vector2Int> antiClockWiseOrderedPositions)
+        private IEnumerator ColorGridInSpiralOrderStack()
         {
-            for (var i = antiClockWiseOrderedPositions.Count - 1; i >= 0; i--)
+            while (OrderedStack.Count > 0)
             {
-                var cellPosition = antiClockWiseOrderedPositions[i];
-                if (IsValidPosition(cellPosition))
+                Vector2Int position = OrderedStack.Pop();
+                if (IsValidPosition(position))
                 {
-                    var cell = GetCell(cellPosition);
+                    var cell = GetCell(position);
                     cell.SetColor(Color.yellow);
-                    yield return null;
+                    yield return new WaitForSeconds(0.2f);
                 }
             }
         }

@@ -29,7 +29,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1.1, y: 1.1, z: 1.1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -76,7 +76,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 1
   m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 1, g: 0.32169712, b: 0, a: 1}
+  m_Color: {r: 1, g: 0, b: 0, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -100,9 +100,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemPrefab: {fileID: 2753048698725361215, guid: 991a81fd3c9c55545a503d57b19170d7, type: 3}
   possibleColors:
-  - {r: 0, g: 0, b: 1, a: 1}
-  - {r: 1, g: 0, b: 0, a: 1}
-  - {r: 0, g: 1, b: 0, a: 1}
+  - {r: 0.26855645, g: 0.26855645, b: 0.8018868, a: 1}
+  - {r: 0.7264151, g: 0.70074016, b: 0.14048593, a: 1}
+  - {r: 0.38656995, g: 0.6886792, b: 0.38656995, a: 1}
 --- !u!61 &2274156749932145799
 BoxCollider2D:
   m_ObjectHideFlags: 0
