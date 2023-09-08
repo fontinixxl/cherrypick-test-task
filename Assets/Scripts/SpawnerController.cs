@@ -41,14 +41,6 @@ namespace Gerard.CherrypickGames
             HandleDrag();
         }
 
-        private void SpawnItemAt(Vector2Int cellPos)
-        {
-            var randomColor = possibleColors[Random.Range(0, possibleColors.Count)];
-            var newItem = Instantiate(itemPrefab, _gridManager.GetWorldPositionFromCell(cellPos), Quaternion.identity);
-            var spriteRenderer = newItem.GetComponent<SpriteRenderer>();
-            spriteRenderer.color = randomColor;
-            _gridManager.GetCell(cellPos).IsCellEmpty = false;
-        }
 
         private void HandleDrag()
         {
@@ -63,7 +55,7 @@ namespace Gerard.CherrypickGames
             }
 
             if (Input.GetMouseButtonUp(0))
-            {
+            {   
                 _isDragging = false;
                 SnapToCell(mouseWorldPosition);
             }
@@ -78,7 +70,9 @@ namespace Gerard.CherrypickGames
         private void SnapToCell(Vector3 mousePosition)
         {
             var closestX = Mathf.RoundToInt(mousePosition.x + _gridManager.XOffset);
-            var closestY = Mathf.RoundToInt(mousePosition.y + _gridManager.YOffset);
+            var closestY =
+                Mathf.RoundToInt(_gridManager.Height - 1 - mousePosition.y -
+                                 _gridManager.YOffset); // Adjust Y calculation
 
             // Ensure we are within grid boundaries
             closestX = Mathf.Clamp(closestX, 0, _gridManager.Width - 1);

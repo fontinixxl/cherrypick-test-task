@@ -51,21 +51,24 @@ namespace Gerard.CherrypickGames
             YOffset = Height * 0.5f - 0.5f;
 
             var centerCoordinates = GetCenterCoordinates();
-            for (var i = 0; i < Height; i++)
+            for (var y = Height - 1; y >= 0; y--) // Start from the top
             {
-                for (var j = 0; j < Width; j++)
+                for (var x = 0; x < Width; x++)
                 {
-                    var cellPosition = new Vector3(j - XOffset, i - YOffset, 0);
+                    var cellPosition = new Vector3(x, Height - 1 - y, 0); // Adjust y-coordinate
                     var cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity, transform)
                         .GetComponent<Cell>();
 
                     // If we are NOT on the center cell, 25% chance the cell will be blocked
-                    var isBlocked = (j != centerCoordinates.x || i != centerCoordinates.y) && Random.value < .25f;
-                    cell.Initialize(new Vector2Int(j, i), isBlocked);
+                    var isBlocked = (x != centerCoordinates.x || y != centerCoordinates.y) && Random.value < .25f;
+                    cell.Initialize(new Vector2Int(x, y), isBlocked);
 
-                    Cells[j, i] = cell;
+                    Cells[x, y] = cell;
                 }
             }
+
+            // Center the entire grid in Unity.
+            transform.position = new Vector3(-XOffset, -YOffset, 0);
         }
 
         // Based on the Width and Height of a two dimensional grid, this method will generate
@@ -121,7 +124,7 @@ namespace Gerard.CherrypickGames
         {
             _startingPosition = GetCenterCoordinates();
             var worldPosition = GetWorldPositionFromCell(_startingPosition);
-            var spawnedGo = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity);
+            var spawnedGo = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform);
             _spawnController = spawnedGo.GetComponent<SpawnerController>();
 
             // Inject dependencies to the SpawnController
@@ -148,7 +151,7 @@ namespace Gerard.CherrypickGames
 
         # region Helpers
 
-        public Cell GetCell(Vector2Int gridPos) => Cells[gridPos.x, Height - 1 - gridPos.y];
+        public Cell GetCell(Vector2Int gridPos) => Cells[gridPos.x, gridPos.y];
 
         public Vector3 GetWorldPositionFromCell(Vector2Int gridPos)
         {
@@ -170,8 +173,6 @@ namespace Gerard.CherrypickGames
             return IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
         }
 
-        #endregion
-
         private IEnumerator ColorGridInSpiralOrderClockWise(List<Vector2Int> antiClockWiseOrderedPositions)
         {
             for (var i = antiClockWiseOrderedPositions.Count - 1; i >= 0; i--)
@@ -181,10 +182,12 @@ namespace Gerard.CherrypickGames
                 {
                     var cell = GetCell(cellPosition);
                     cell.SetColor(Color.yellow);
-                    yield return new WaitForSeconds(0.5f);
+                    yield return null;
                 }
             }
         }
+
+        #endregion
     }
 
     internal struct GridData
