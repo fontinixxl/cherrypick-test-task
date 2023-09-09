@@ -9,7 +9,7 @@ namespace Gerard.CherrypickGames
     {
         [SerializeField] private GameObject itemPrefab;
 
-        private GridManager _gridManager;
+        private GridController _gridController;
         private bool _isDragging;
         private Camera _mainCamera;
         private Collider2D _collider2D;
@@ -23,27 +23,27 @@ namespace Gerard.CherrypickGames
             _collider2D = GetComponent<Collider2D>();
         }
 
-        public void Initialize(GridManager gridManager, Action callBack)
+        public void Initialize(GridController gridController, Action callBack)
         {
-            _gridManager = gridManager;
+            _gridController = gridController;
             _onSpawningCompletedCallback = callBack;
         }
 
         public void SpawnItems()
         {
-            if (_gridManager.OrderedStack == null) return;
+            if (_gridController.OrderedStack == null) return;
 
-            var possibleColors = _gridManager.PossibleColors;
-            while (_gridManager.OrderedStack.Count > 0)
+            var possibleColors = _gridController.PossibleColors;
+            while (_gridController.OrderedStack.Count > 0)
             {
-                var targetGridPosition = _gridManager.OrderedStack.Pop();
-                if (_gridManager.IsValidPosition(targetGridPosition))
+                var targetGridPosition = _gridController.OrderedStack.Pop();
+                if (_gridController.IsValidPosition(targetGridPosition))
                 {
-                    var targetPosition = _gridManager.GetCell(targetGridPosition).transform.position;
-                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridManager.transform)
+                    var targetPosition = _gridController.GetCell(targetGridPosition).transform.position;
+                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridController.transform)
                         .GetComponent<Item>();
                     var color = possibleColors[Random.Range(0, possibleColors.Count)];
-                    _gridManager.GetCell(targetGridPosition).AddItem(item, color);
+                    _gridController.GetCell(targetGridPosition).AddItem(item, color);
 
                     // Start animation towards target cell
                     StartCoroutine(MoveItemToTargetPosition(item.transform, targetPosition, .1f));
@@ -101,17 +101,17 @@ namespace Gerard.CherrypickGames
 
         private bool SnapToCell(Vector3 mousePosition, out Vector2Int newGridPosition)
         {
-            var closestX = Mathf.RoundToInt(mousePosition.x + _gridManager.XOffset);
+            var closestX = Mathf.RoundToInt(mousePosition.x + _gridController.XOffset);
             var closestY =
-                Mathf.RoundToInt(_gridManager.Height - 1 - mousePosition.y -
-                                 _gridManager.YOffset); // Adjust Y calculation
+                Mathf.RoundToInt(_gridController.Height - 1 - mousePosition.y -
+                                 _gridController.YOffset); // Adjust Y calculation
 
             // Ensure we are within grid boundaries
-            closestX = Mathf.Clamp(closestX, 0, _gridManager.Width - 1);
-            closestY = Mathf.Clamp(closestY, 0, _gridManager.Height - 1);
+            closestX = Mathf.Clamp(closestX, 0, _gridController.Width - 1);
+            closestY = Mathf.Clamp(closestY, 0, _gridController.Height - 1);
 
             newGridPosition = new Vector2Int(closestX, closestY);
-            var targetCell = _gridManager.GetCell(newGridPosition);
+            var targetCell = _gridController.GetCell(newGridPosition);
 
             if (targetCell.IsBlocked || !targetCell.IsEmpty)
             {

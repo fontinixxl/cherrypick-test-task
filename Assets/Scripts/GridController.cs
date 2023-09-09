@@ -5,53 +5,28 @@ using Random = UnityEngine.Random;
 
 namespace Gerard.CherrypickGames
 {
-    public class GridManager : MonoBehaviour
+    public class GridController : MonoBehaviour
     {
+        // Used to deserialize the json data
+        private struct GridData
+        {
+            public int Width;
+            public int Height;
+        }
+
         [SerializeField] private GameObject cellPrefab;
-        [SerializeField] private GameObject spawnerPrefab;
         [SerializeField] private List<Color> possibleColors = new();
 
-        private SpawnerController _spawnController;
         private Vector2Int _startingGridPosition;
         private bool[,] _visitedCells;
-        private bool _isSpawning;
 
-        private void Start()
+        public void Initialize()
         {
             if (!LoadGridConfig()) return;
-            Initialize();
-            GenerateGrid();
-            SpawnSpawner();
-            CalculateSpiralGridPath(_startingGridPosition);
-        }
-
-        private void Update()
-        {
-            if (!_isSpawning && Input.GetKeyDown(KeyCode.Backspace))
-            {
-                ClearNeighbouringColourCells();
-                return;
-            }
-
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                _isSpawning = !_isSpawning;
-            }
-
-            if (_isSpawning)
-            {
-                _spawnController.SpawnItems();
-            }
-            else
-            {
-                _spawnController.HandleDrag(CalculateSpiralGridPath);
-            }
-        }
-
-        private void Initialize()
-        {
             OrderedStack = new Stack<Vector2Int>(Width * Height);
             _visitedCells = new bool[Width, Height];
+            GenerateGrid();
+            CalculateSpiralGridPath(_startingGridPosition);
         }
 
         private bool LoadGridConfig()
@@ -97,27 +72,11 @@ namespace Gerard.CherrypickGames
             transform.position = new Vector3(-XOffset, -YOffset, 0);
         }
 
-        private void SpawnSpawner()
-        {
-            _startingGridPosition = GetCenterCoordinates();
-            var worldPosition = GetWorldPositionFromCell(_startingGridPosition);
-            _spawnController = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform)
-                .GetComponent<SpawnerController>();
-
-            // Inject dependencies to the SpawnController
-            _spawnController.Initialize(this, OnSpawnerSpawningCompleted);
-        }
-
-        private void OnSpawnerSpawningCompleted()
-        {
-            _isSpawning = false;
-        }
-
         // Based on the Width and Height of a two dimensional grid, this method will generate
         // a Stack containing the grid coordinates in a clock wise pattern.
         // Algorithm based on the following article:
         // https://javaconceptoftheday.com/how-to-create-spiral-of-numbers-matrix-in-java/
-        private void CalculateSpiralGridPath(Vector2Int spawnerGridPosition)
+        public void CalculateSpiralGridPath(Vector2Int spawnerGridPosition)
         {
             OrderedStack.Clear();
 
@@ -131,25 +90,29 @@ namespace Gerard.CherrypickGames
             {
                 for (var i = minRow; i <= maxRow; i++)
                 {
-                    OrderedStack.Push(new Vector2Int(minCol, i));
+                    var gridPos = new Vector2Int(minCol, i);
+                    OrderedStack.Push(gridPos);
                     value++;
                 }
 
                 for (var i = minCol + 1; i <= maxCol; i++)
                 {
-                    OrderedStack.Push(new Vector2Int(i, maxRow));
+                    var gridPos = new Vector2Int(i, maxRow);
+                    OrderedStack.Push(gridPos);
                     value++;
                 }
 
                 for (var i = maxRow - 1; i >= minRow; i--)
                 {
-                    OrderedStack.Push(new Vector2Int(maxCol, i));
+                    var gridPos = new Vector2Int(maxCol, i);
+                    OrderedStack.Push(gridPos);
                     value++;
                 }
 
                 for (var i = maxCol - 1; i >= minCol + 1; i--)
                 {
-                    OrderedStack.Push(new Vector2Int(i, minRow));
+                    var gridPos = new Vector2Int(i, minRow);
+                    OrderedStack.Push(gridPos);
                     value++;
                 }
 
@@ -165,7 +128,7 @@ namespace Gerard.CherrypickGames
 
         # region Clear_Neighbours
 
-        private void ClearNeighbouringColourCells()
+        public void ClearNeighbouringColourCells()
         {
             Array.Clear(_visitedCells, 0, _visitedCells.Length);
             ClearNeighbourCellsSameColor();
@@ -230,7 +193,7 @@ namespace Gerard.CherrypickGames
 
         # region Helpers
 
-        private Vector2Int GetCenterCoordinates()
+        public Vector2Int GetCenterCoordinates()
         {
             int centerX = Width / 2;
             int centerY = Height / 2;
@@ -238,7 +201,7 @@ namespace Gerard.CherrypickGames
             // If the width and height are both even, take the bottom-left cell of the four centers.
             if (Width % 2 == 0 && Height % 2 == 0)
             {
-                centerCoordinates = new Vector2Int(centerX - 1, centerY - 1);
+                centerCoordinates = new Vector2Int(centerX, centerY - 1);
             }
             else
             {
@@ -253,7 +216,7 @@ namespace Gerard.CherrypickGames
         public bool IsValidPosition(Vector2Int cellPos) =>
             IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
 
-        private Vector3 GetWorldPositionFromCell(Vector2Int gridPos) =>
+        public Vector3 GetWorldPositionFromCell(Vector2Int gridPos) =>
             GetCell(gridPos).GetComponent<Transform>().position;
 
         private bool IsCellWithinBounds(Vector2Int cellPos) =>
@@ -274,11 +237,5 @@ namespace Gerard.CherrypickGames
         public List<Color> PossibleColors => possibleColors;
 
         #endregion
-    }
-
-    internal struct GridData
-    {
-        public int Width;
-        public int Height;
     }
 }
