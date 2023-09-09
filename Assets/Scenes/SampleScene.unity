@@ -169,6 +169,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cellPrefab: {fileID: 3949291243886240789, guid: 392ca395897fc484aa876e36e5752618, type: 3}
   spawnerPrefab: {fileID: 37653448704547209, guid: 6f34232d7d345944ba49a3f30d6240a6, type: 3}
+  possibleColors:
+  - {r: 0.3099858, g: 0.3099858, b: 0.8113208, a: 1}
+  - {r: 0.6981132, g: 0.66741365, b: 0.31283376, a: 1}
+  - {r: 0.754717, g: 0.2741189, b: 0.70957685, a: 1}
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -230,7 +234,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 15
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2

@@ -4,11 +4,8 @@ namespace Gerard.CherrypickGames
 {
     public class Cell : MonoBehaviour
     {
-        public bool IsBlocked { get; private set; }
-        public Vector2Int GridPosition { get; private set; }
-        public bool IsCellEmpty { get; set; }
-
         private SpriteRenderer _spriteRenderer;
+        private Item _item;
 
         private void Awake()
         {
@@ -26,11 +23,27 @@ namespace Gerard.CherrypickGames
             }
             else
             {
-                IsCellEmpty = true;
                 _spriteRenderer.color = (GridPosition.x + GridPosition.y) % 2 == 0 ? Color.white : Color.gray;
             }
         }
 
-        public void SetColor(Color color) => _spriteRenderer.color = color;
+        public void AddItem(Item item, Color color)
+        {
+            _item = item;
+            _item.Color = color;
+        }
+
+        public void ClearCell()
+        {
+            if (_item != null)
+            {
+                Destroy(_item.gameObject);
+            }
+        }
+
+        public bool IsBlocked { get; private set; }
+        public Vector2Int GridPosition { get; private set; }
+        public bool IsEmpty => _item == null;
+        public Color ItemColor => _item.Color;
     }
 }

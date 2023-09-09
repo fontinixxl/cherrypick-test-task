@@ -1,6 +1,7 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace Gerard.CherrypickGames
 {
@@ -8,25 +9,49 @@ namespace Gerard.CherrypickGames
     {
         [SerializeField] private GameObject cellPrefab;
         [SerializeField] private GameObject spawnerPrefab;
-
-        public Cell[,] Cells { get; private set; }
-        public float XOffset { get; private set; }
-        public float YOffset { get; private set; }
-        public int Width { get; private set; }
-        public int Height { get; private set; }
-        public Stack<Vector2Int> OrderedStack { get; private set; }
+        [SerializeField] private List<Color> possibleColors = new();
 
         private SpawnerController _spawnController;
-        private Vector2Int _startingPosition;
+        private Vector2Int _startingGridPosition;
+        private bool[,] _visitedCells;
+        private bool _isSpawning;
 
         private void Start()
         {
             if (!LoadGridConfig()) return;
-
+            Initialize();
             GenerateGrid();
-            GenerateClockWiseOrderedGridPositionsList();
-            // StartCoroutine(ColorGridInSpiralOrderStack());
-            SpawnSpawnerItem();
+            SpawnSpawner();
+            CalculateSpiralGridPath(_startingGridPosition);
+        }
+
+        private void Update()
+        {
+            if (!_isSpawning && Input.GetKeyDown(KeyCode.Backspace))
+            {
+                ClearNeighbouringColourCells();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                _isSpawning = !_isSpawning;
+            }
+
+            if (_isSpawning)
+            {
+                _spawnController.SpawnItems();
+            }
+            else
+            {
+                _spawnController.HandleDrag(CalculateSpiralGridPath);
+            }
+        }
+
+        private void Initialize()
+        {
+            OrderedStack = new Stack<Vector2Int>(Width * Height);
+            _visitedCells = new bool[Width, Height];
         }
 
         private bool LoadGridConfig()
@@ -72,13 +97,30 @@ namespace Gerard.CherrypickGames
             transform.position = new Vector3(-XOffset, -YOffset, 0);
         }
 
+        private void SpawnSpawner()
+        {
+            _startingGridPosition = GetCenterCoordinates();
+            var worldPosition = GetWorldPositionFromCell(_startingGridPosition);
+            _spawnController = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform)
+                .GetComponent<SpawnerController>();
+
+            // Inject dependencies to the SpawnController
+            _spawnController.Initialize(this, OnSpawnerSpawningCompleted);
+        }
+
+        private void OnSpawnerSpawningCompleted()
+        {
+            _isSpawning = false;
+        }
+
         // Based on the Width and Height of a two dimensional grid, this method will generate
-        // a list containing the grid coordinates ordered following an anti-clock wise pattern
+        // a Stack containing the grid coordinates in a clock wise pattern.
         // Algorithm based on the following article:
         // https://javaconceptoftheday.com/how-to-create-spiral-of-numbers-matrix-in-java/
-        private void GenerateClockWiseOrderedGridPositionsList()
+        private void CalculateSpiralGridPath(Vector2Int spawnerGridPosition)
         {
-            OrderedStack = new Stack<Vector2Int>(Width * Height);
+            OrderedStack.Clear();
+
             var value = 1;
             var minCol = 0;
             var maxCol = Width - 1;
@@ -117,20 +159,76 @@ namespace Gerard.CherrypickGames
                 maxRow--;
             }
 
-            // Discard the first one since is where the spawner is
+            // Discard the first one since it's where the spawner is
             OrderedStack.Pop();
         }
 
-        private void SpawnSpawnerItem()
-        {
-            _startingPosition = GetCenterCoordinates();
-            var worldPosition = GetWorldPositionFromCell(_startingPosition);
-            var spawnedGo = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform);
-            _spawnController = spawnedGo.GetComponent<SpawnerController>();
+        # region Clear_Neighbours
 
-            // Inject dependencies to the SpawnController
-            _spawnController.Initialize(this, _startingPosition);
+        private void ClearNeighbouringColourCells()
+        {
+            Array.Clear(_visitedCells, 0, _visitedCells.Length);
+            ClearNeighbourCellsSameColor();
+            CalculateSpiralGridPath(_startingGridPosition);
         }
+
+        private void ClearNeighbourCellsSameColor()
+        {
+            foreach (var color in PossibleColors)
+            {
+                for (var x = 0; x < Width; x++)
+                {
+                    for (var y = 0; y < Height; y++)
+                    {
+                        var cell = GetCell(new Vector2Int(x, y));
+                        if (!_visitedCells[x, y] && !cell.IsEmpty && cell.ItemColor == color)
+                        {
+                            List<Cell> sameColoredCells = new List<Cell>();
+                            DFS(cell.GridPosition, color, sameColoredCells);
+
+                            // Clear if 2 or more
+                            if (sameColoredCells.Count >= 2)
+                            {
+                                foreach (var sameColorCell in sameColoredCells)
+                                {
+                                    sameColorCell.ClearCell();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Depth-First Search Algorithm: https://en.wikipedia.org/wiki/Depth-first_search
+        private void DFS(Vector2Int position, Color targetColor, List<Cell> sameColoredCells)
+        {
+            // Base conditions for out-of-bounds
+            if (position.x < 0 || position.x >= Width || position.y < 0 || position.y >= Height)
+                return;
+
+            var cell = GetCell(position);
+
+            // Check if cell is null, already visited, or color mismatch
+            if (cell == null || cell.IsEmpty || _visitedCells[position.x, position.y] || cell.ItemColor != targetColor)
+                return;
+
+            // Mark as visited
+            _visitedCells[position.x, position.y] = true;
+
+            // Add to the same colored cells list
+            sameColoredCells.Add(cell);
+
+            // Go in all directions: up, down, left, right
+            DFS(new Vector2Int(position.x + 1, position.y), targetColor, sameColoredCells);
+            DFS(new Vector2Int(position.x - 1, position.y), targetColor, sameColoredCells);
+            DFS(new Vector2Int(position.x, position.y + 1), targetColor, sameColoredCells);
+            DFS(new Vector2Int(position.x, position.y - 1), targetColor, sameColoredCells);
+        }
+
+        #endregion
+
+        # region Helpers
 
         private Vector2Int GetCenterCoordinates()
         {
@@ -150,43 +248,30 @@ namespace Gerard.CherrypickGames
             return centerCoordinates;
         }
 
-        # region Helpers
-
         public Cell GetCell(Vector2Int gridPos) => Cells[gridPos.x, gridPos.y];
 
-        public Vector3 GetWorldPositionFromCell(Vector2Int gridPos)
-        {
-            return GetCell(gridPos).GetComponent<Transform>().position;
-        }
+        public bool IsValidPosition(Vector2Int cellPos) =>
+            IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
 
-        public bool IsCellWithinBounds(Vector2Int cellPos)
-        {
-            return cellPos.x >= 0 && cellPos.x < Width && cellPos.y >= 0 && cellPos.y < Height;
-        }
+        private Vector3 GetWorldPositionFromCell(Vector2Int gridPos) =>
+            GetCell(gridPos).GetComponent<Transform>().position;
 
-        public bool IsCellEmpty(Vector2Int cellPos)
-        {
-            return GetCell(cellPos).IsCellEmpty;
-        }
+        private bool IsCellWithinBounds(Vector2Int cellPos) =>
+            cellPos.x >= 0 && cellPos.x < Width && cellPos.y >= 0 && cellPos.y < Height;
 
-        public bool IsValidPosition(Vector2Int cellPos)
-        {
-            return IsCellWithinBounds(cellPos) && IsCellEmpty(cellPos) && !GetCell(cellPos).IsBlocked;
-        }
+        private bool IsCellEmpty(Vector2Int cellPos) => GetCell(cellPos).IsEmpty;
 
-        private IEnumerator ColorGridInSpiralOrderStack()
-        {
-            while (OrderedStack.Count > 0)
-            {
-                Vector2Int position = OrderedStack.Pop();
-                if (IsValidPosition(position))
-                {
-                    var cell = GetCell(position);
-                    cell.SetColor(Color.yellow);
-                    yield return new WaitForSeconds(0.2f);
-                }
-            }
-        }
+        #endregion
+
+        #region Autoproperties
+
+        private Cell[,] Cells { get; set; }
+        public float XOffset { get; private set; }
+        public float YOffset { get; private set; }
+        public int Width { get; private set; }
+        public int Height { get; private set; }
+        public Stack<Vector2Int> OrderedStack { get; private set; }
+        public List<Color> PossibleColors => possibleColors;
 
         #endregion
     }

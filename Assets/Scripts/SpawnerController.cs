@@ -1,6 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
+using System.Collections;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace Gerard.CherrypickGames
 {
@@ -8,27 +9,13 @@ namespace Gerard.CherrypickGames
     {
         [SerializeField] private GameObject itemPrefab;
 
-        [SerializeField] private List<Color> possibleColors = new()
-        {
-            Color.blue,
-            Color.red,
-            Color.green
-        };
-
         private GridManager _gridManager;
         private bool _isDragging;
         private Camera _mainCamera;
         private Collider2D _collider2D;
         private Vector3 _originalPositionBeforeDrag;
 
-        private Vector2Int _currentGridPos;
-        private bool _isSpawning = false;
-
-        public void Initialize(GridManager gridManager, Vector2Int initialGridPosition)
-        {
-            _gridManager = gridManager;
-            _currentGridPos = initialGridPosition;
-        }
+        private Action _onSpawningCompletedCallback;
 
         private void Awake()
         {
@@ -36,48 +23,38 @@ namespace Gerard.CherrypickGames
             _collider2D = GetComponent<Collider2D>();
         }
 
-        private void Update()
+        public void Initialize(GridManager gridManager, Action callBack)
         {
-            if (_gridManager == null) return;
-
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                _isSpawning = !_isSpawning;
-            }
-
-            if (_isSpawning)
-            {
-                SpawnColoredItems();
-            }
-            else
-            {
-                HandleDrag();
-            }
+            _gridManager = gridManager;
+            _onSpawningCompletedCallback = callBack;
         }
 
-        private void SpawnColoredItems()
+        public void SpawnItems()
         {
-            if (_gridManager.OrderedStack == null || _gridManager.OrderedStack.Count == 0) return;
+            if (_gridManager.OrderedStack == null) return;
 
+            var possibleColors = _gridManager.PossibleColors;
             while (_gridManager.OrderedStack.Count > 0)
             {
                 var targetGridPosition = _gridManager.OrderedStack.Pop();
                 if (_gridManager.IsValidPosition(targetGridPosition))
                 {
                     var targetPosition = _gridManager.GetCell(targetGridPosition).transform.position;
-                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridManager.transform);
-                    item.GetComponent<SpriteRenderer>().color = possibleColors[Random.Range(0, possibleColors.Count)];
+                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridManager.transform)
+                        .GetComponent<Item>();
+                    var color = possibleColors[Random.Range(0, possibleColors.Count)];
+                    _gridManager.GetCell(targetGridPosition).AddItem(item, color);
 
-                    // Start animation coroutine
-                    StartCoroutine(MoveToPosition(item.transform, targetPosition, .1f));
+                    // Start animation towards target cell
+                    StartCoroutine(MoveItemToTargetPosition(item.transform, targetPosition, .1f));
                     return;
                 }
             }
 
-            _isSpawning = false;
+            _onSpawningCompletedCallback.Invoke();
         }
 
-        private IEnumerator MoveToPosition(Transform itemTransform, Vector3 targetPosition, float duration)
+        private IEnumerator MoveItemToTargetPosition(Transform itemTransform, Vector3 targetPosition, float duration)
         {
             var startPosition = itemTransform.position;
             float elapsed = 0;
@@ -85,7 +62,7 @@ namespace Gerard.CherrypickGames
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float normalizedTime = elapsed / duration; // value between 0 and 1
+                var normalizedTime = elapsed / duration; // value between 0 and 1
                 itemTransform.position = Vector3.Lerp(startPosition, targetPosition, normalizedTime);
                 yield return null;
             }
@@ -93,7 +70,7 @@ namespace Gerard.CherrypickGames
             itemTransform.position = targetPosition; // ensure the item reaches the exact target position
         }
 
-        private void HandleDrag()
+        public void HandleDrag(Action<Vector2Int> onSpawnerMovedCallback)
         {
             var mouseWorldPosition = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
             if (Input.GetMouseButtonDown(0))
@@ -107,8 +84,12 @@ namespace Gerard.CherrypickGames
 
             if (Input.GetMouseButtonUp(0) && _isDragging)
             {
+                if (SnapToCell(mouseWorldPosition, out var newGridPosition))
+                {
+                    onSpawnerMovedCallback?.Invoke(newGridPosition);
+                }
+
                 _isDragging = false;
-                SnapToCell(mouseWorldPosition);
             }
 
             if (_isDragging)
@@ -118,7 +99,7 @@ namespace Gerard.CherrypickGames
             }
         }
 
-        private void SnapToCell(Vector3 mousePosition)
+        private bool SnapToCell(Vector3 mousePosition, out Vector2Int newGridPosition)
         {
             var closestX = Mathf.RoundToInt(mousePosition.x + _gridManager.XOffset);
             var closestY =
@@ -129,15 +110,20 @@ namespace Gerard.CherrypickGames
             closestX = Mathf.Clamp(closestX, 0, _gridManager.Width - 1);
             closestY = Mathf.Clamp(closestY, 0, _gridManager.Height - 1);
 
-            var closestCell = _gridManager.Cells[closestX, closestY];
-            if (closestCell.IsBlocked)
+            newGridPosition = new Vector2Int(closestX, closestY);
+            var targetCell = _gridManager.GetCell(newGridPosition);
+
+            if (targetCell.IsBlocked || !targetCell.IsEmpty)
             {
                 transform.position = _originalPositionBeforeDrag;
             }
             else
             {
-                transform.position = closestCell.transform.position;
+                transform.position = targetCell.transform.position;
             }
+
+            // If current position is different than original means the snapping was successful
+            return transform.position != _originalPositionBeforeDrag;
         }
     }
 }
