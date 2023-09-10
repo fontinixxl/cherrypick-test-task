@@ -5,51 +5,30 @@ using Random = UnityEngine.Random;
 
 namespace Gerard.CherrypickGames
 {
-    public class GridController : MonoBehaviour
+    public class GridManager : MonoBehaviour
     {
-        // Used to deserialize the json data
-        private struct GridData
-        {
-            public int Width;
-            public int Height;
-        }
-
-        [SerializeField] private GameObject cellPrefab;
+        [SerializeField] private Cell cellPrefab;
         [SerializeField] private List<Color> possibleColors = new();
+        [SerializeField] private int cellSize = 1;
 
         private Vector2Int _startingGridPosition;
         private bool[,] _visitedCells;
 
-        public void Initialize()
+        public void Initialize(int width, int height)
         {
-            if (!LoadGridConfig()) return;
+            Width = width;
+            Height = height;
             OrderedStack = new Stack<Vector2Int>(Width * Height);
             _visitedCells = new bool[Width, Height];
             GenerateGrid();
             CalculateSpiralGridPath(_startingGridPosition);
         }
 
-        private bool LoadGridConfig()
-        {
-            var json = Resources.Load<TextAsset>("gridConfig");
-            if (json == null)
-            {
-                Debug.LogError("gridConfig.json resource not found!");
-                return false;
-            }
-
-            var gridData = JsonUtility.FromJson<GridData>(json.ToString());
-            Width = gridData.Width;
-            Height = gridData.Height;
-
-            return true;
-        }
-
         private void GenerateGrid()
         {
             Cells = new Cell[Width, Height];
-            XOffset = Width * 0.5f - 0.5f;
-            YOffset = Height * 0.5f - 0.5f;
+            XOffset = Width * 0.5f - CellSize;
+            YOffset = Height * 0.5f - CellSize;
 
             var centerCoordinates = GetCenterCoordinates();
             for (var y = Height - 1; y >= 0; y--) // Start from the top
@@ -57,8 +36,7 @@ namespace Gerard.CherrypickGames
                 for (var x = 0; x < Width; x++)
                 {
                     var cellPosition = new Vector3(x, Height - 1 - y, 0); // Adjust y-coordinate
-                    var cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity, transform)
-                        .GetComponent<Cell>();
+                    var cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity, transform);
 
                     // If we are NOT on the center cell, 25% chance the cell will be blocked
                     var isBlocked = (x != centerCoordinates.x || y != centerCoordinates.y) && Random.value < .25f;
@@ -235,6 +213,7 @@ namespace Gerard.CherrypickGames
         public int Height { get; private set; }
         public Stack<Vector2Int> OrderedStack { get; private set; }
         public List<Color> PossibleColors => possibleColors;
+        public int CellSize => cellSize;
 
         #endregion
     }

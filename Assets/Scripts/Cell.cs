@@ -37,7 +37,6 @@ namespace Gerard.CherrypickGames
         {
             if (_item != null)
             {
-                // _item.gameObject.SetActive(false);
                 Destroy(_item.gameObject);
             }
         }

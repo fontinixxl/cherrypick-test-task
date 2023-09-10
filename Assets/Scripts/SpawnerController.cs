@@ -7,43 +7,45 @@ namespace Gerard.CherrypickGames
 {
     public class SpawnerController : MonoBehaviour
     {
-        [SerializeField] private GameObject itemPrefab;
+        [SerializeField] private Item itemPrefab;
 
-        private GridController _gridController;
+        private GridManager _gridManager;
         private bool _isDragging;
         private Camera _mainCamera;
         private Collider2D _collider2D;
         private Vector3 _originalPositionBeforeDrag;
 
-        private Action _onSpawningCompletedCallback;
+        private Action _onAllItemsSpawned;
+        private Action<Vector2Int> _onSpawnerMoved;
 
         private void Awake()
         {
-            _mainCamera = Camera.main;
             _collider2D = GetComponent<Collider2D>();
         }
 
-        public void Initialize(GridController gridController, Action callBack)
+        public void Initialize(GridManager gridManager, Camera mainCamera, Action onAllItemsSpawned,
+            Action<Vector2Int> onSpawnerMoved)
         {
-            _gridController = gridController;
-            _onSpawningCompletedCallback = callBack;
+            _gridManager = gridManager;
+            _mainCamera = mainCamera;
+            _onAllItemsSpawned = onAllItemsSpawned;
+            _onSpawnerMoved = onSpawnerMoved;
         }
 
-        public void SpawnItems()
+        public void Spawn()
         {
-            if (_gridController.OrderedStack == null) return;
+            if (_gridManager.OrderedStack == null) return;
 
-            var possibleColors = _gridController.PossibleColors;
-            while (_gridController.OrderedStack.Count > 0)
+            var possibleColors = _gridManager.PossibleColors;
+            while (_gridManager.OrderedStack.Count > 0)
             {
-                var targetGridPosition = _gridController.OrderedStack.Pop();
-                if (_gridController.IsValidPosition(targetGridPosition))
+                var targetGridPosition = _gridManager.OrderedStack.Pop();
+                if (_gridManager.IsValidPosition(targetGridPosition))
                 {
-                    var targetPosition = _gridController.GetCell(targetGridPosition).transform.position;
-                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridController.transform)
-                        .GetComponent<Item>();
+                    var targetPosition = _gridManager.GetCell(targetGridPosition).transform.position;
+                    var item = Instantiate(itemPrefab, transform.position, Quaternion.identity, _gridManager.transform);
                     var color = possibleColors[Random.Range(0, possibleColors.Count)];
-                    _gridController.GetCell(targetGridPosition).AddItem(item, color);
+                    _gridManager.GetCell(targetGridPosition).AddItem(item, color);
 
                     // Start animation towards target cell
                     StartCoroutine(MoveItemToTargetPosition(item.transform, targetPosition, .1f));
@@ -51,7 +53,7 @@ namespace Gerard.CherrypickGames
                 }
             }
 
-            _onSpawningCompletedCallback.Invoke();
+            _onAllItemsSpawned.Invoke();
         }
 
         private IEnumerator MoveItemToTargetPosition(Transform itemTransform, Vector3 targetPosition, float duration)
@@ -70,23 +72,26 @@ namespace Gerard.CherrypickGames
             itemTransform.position = targetPosition; // ensure the item reaches the exact target position
         }
 
-        public void HandleDrag(Action<Vector2Int> onSpawnerMovedCallback)
+        public bool IsMouseOverOrDragging()
+        {
+            var mouseWorldPosition = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
+            return _collider2D.OverlapPoint(mouseWorldPosition) || _isDragging;
+        }
+
+        public void HandleDrag()
         {
             var mouseWorldPosition = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
             if (Input.GetMouseButtonDown(0))
             {
-                if (_collider2D.OverlapPoint(mouseWorldPosition))
-                {
-                    _originalPositionBeforeDrag = transform.position;
-                    _isDragging = true;
-                }
+                _originalPositionBeforeDrag = transform.position;
+                _isDragging = true;
             }
 
             if (Input.GetMouseButtonUp(0) && _isDragging)
             {
                 if (SnapToCell(mouseWorldPosition, out var newGridPosition))
                 {
-                    onSpawnerMovedCallback?.Invoke(newGridPosition);
+                    _onSpawnerMoved?.Invoke(newGridPosition);
                 }
 
                 _isDragging = false;
@@ -101,17 +106,17 @@ namespace Gerard.CherrypickGames
 
         private bool SnapToCell(Vector3 mousePosition, out Vector2Int newGridPosition)
         {
-            var closestX = Mathf.RoundToInt(mousePosition.x + _gridController.XOffset);
+            var closestX = Mathf.RoundToInt(mousePosition.x + _gridManager.XOffset);
             var closestY =
-                Mathf.RoundToInt(_gridController.Height - 1 - mousePosition.y -
-                                 _gridController.YOffset); // Adjust Y calculation
+                Mathf.RoundToInt(_gridManager.Height - 1 - mousePosition.y -
+                                 _gridManager.YOffset); // Adjust Y calculation
 
             // Ensure we are within grid boundaries
-            closestX = Mathf.Clamp(closestX, 0, _gridController.Width - 1);
-            closestY = Mathf.Clamp(closestY, 0, _gridController.Height - 1);
+            closestX = Mathf.Clamp(closestX, 0, _gridManager.Width - 1);
+            closestY = Mathf.Clamp(closestY, 0, _gridManager.Height - 1);
 
             newGridPosition = new Vector2Int(closestX, closestY);
-            var targetCell = _gridController.GetCell(newGridPosition);
+            var targetCell = _gridManager.GetCell(newGridPosition);
 
             if (targetCell.IsBlocked || !targetCell.IsEmpty)
             {

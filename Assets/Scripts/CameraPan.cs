@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Gerard.CherrypickGames
 {
@@ -8,13 +7,6 @@ namespace Gerard.CherrypickGames
     {
         [SerializeField] private float panSpeed = 20f; // Speed of the camera movement
         private Vector3 _lastMousePosition; // Stores the position of the mouse in the last frame
-        private Camera _mainCamera;
-
-
-        private void Awake()
-        {
-            _mainCamera = GetComponent<Camera>();
-        }
 
         public void HandleCameraMovement()
         {
@@ -31,7 +23,5 @@ namespace Gerard.CherrypickGames
                 _lastMousePosition = Input.mousePosition;
             }
         }
-        
-        public Camera MainCamera => _mainCamera;
     }
 }

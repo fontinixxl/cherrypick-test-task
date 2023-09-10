@@ -1,74 +1,120 @@
-﻿using UnityEngine;
+﻿using Gerard.CherryPickGames.UI;
+using UnityEngine;
 
 namespace Gerard.CherrypickGames
 {
+    // Used to deserialize the json data
+    internal struct GridData
+    {
+        public int Width;
+        public int Height;
+    }
+
     public class GameManager : MonoBehaviour
     {
-        [SerializeField] private CameraPan cameraPan;
-        [SerializeField] private GridController gridController;
+        [Header("Dependencies")]
+        [SerializeField] private UIManager uiManager;
+        [SerializeField] private GridManager gridManager;
+        [SerializeField] private CameraController cameraController;
+        [Header("Data")]
         [SerializeField] private GameObject spawnerPrefab;
 
-        private SpawnerController _spawnerController;
-        private bool _isSpawning;
+        private SpawnerController _spawner;
+        private bool _isSpawningButtonPressed;
+
+        private void OnEnable()
+        {
+            uiManager.SpawnButton.OnButtonStateChanged += StartStopSpawnerButtonHandler;
+            uiManager.ClearingButton.OnButtonPressed += OnClearButtonPressedHandler;
+        }
+
+        private void OnDisable()
+        {
+            uiManager.SpawnButton.OnButtonStateChanged -= StartStopSpawnerButtonHandler;
+            uiManager.ClearingButton.OnButtonPressed -= OnClearButtonPressedHandler;
+        }
 
         private void Start()
         {
-            gridController.Initialize();
+            if (!LoadGridConfig(out var gridData)) return;
+            gridManager.Initialize(gridData.Width, gridData.Height);
+            UpdateCameraZoomLimits(gridData);
             SpawnSpawner();
         }
 
         private void Update()
         {
-            if (!_isSpawning && Input.GetKeyDown(KeyCode.Backspace))
+            if (_isSpawningButtonPressed)
             {
-                gridController.ClearNeighbouringColourCells();
+                _spawner.Spawn();
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Space))
+            // Spawner has movement priority whether the pointer is on the spawner or we are already dragging it
+            if (_spawner.IsMouseOverOrDragging())
             {
-                _isSpawning = !_isSpawning;
-            }
-
-            if (_isSpawning)
-            {
-                _spawnerController.SpawnItems();
-                // _isSpawning = false; // Debug: Spawn one each time space is pressed
-                return;
-            }
-
-            // If we are hovering over the spawner, block camera panning
-            if (IsMouseOverSpawner())
-            {
-                _spawnerController.HandleDrag(gridController.CalculateSpiralGridPath);
+                _spawner.HandleDrag();
             }
             else
             {
-                cameraPan.HandleCameraMovement();
+                cameraController.HandleMovement();
             }
+        }
+
+        private void UpdateCameraZoomLimits(GridData gridData)
+        {
+            var gridWidth = gridData.Width * gridManager.CellSize;
+            var gridHeight = gridData.Height * gridManager.CellSize;
+            cameraController.UpdateZoomLimits(gridWidth, gridHeight);
         }
 
         private void SpawnSpawner()
         {
-            var startingGridPosition = gridController.GetCenterCoordinates();
-            var worldPosition = gridController.GetWorldPositionFromCell(startingGridPosition);
-            _spawnerController = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform)
+            var startingGridPosition = gridManager.GetCenterCoordinates();
+            var worldPosition = gridManager.GetWorldPositionFromCell(startingGridPosition);
+            _spawner = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform)
                 .GetComponent<SpawnerController>();
 
             // Inject dependencies to the SpawnController
-            _spawnerController.Initialize(gridController, OnSpawnerSpawningCompleted);
+            _spawner.Initialize(gridManager, cameraController.MainCamera, OnAllItemsSpawnHandler, OnSpawnerMovedHandler);
         }
 
-        private void OnSpawnerSpawningCompleted()
+        private bool LoadGridConfig(out GridData gridData)
         {
-            _isSpawning = false;
+            gridData = default;
+            var json = Resources.Load<TextAsset>("gridConfig");
+            if (json == null)
+            {
+                Debug.LogError("gridConfig.json resource not found!");
+                return false;
+            }
+
+            gridData = JsonUtility.FromJson<GridData>(json.ToString());
+            return true;
         }
 
-        private bool IsMouseOverSpawner()
+        #region Action Handlers
+
+        private void OnSpawnerMovedHandler(Vector2Int newCoordinate)
         {
-            var mousePosition = cameraPan.MainCamera.ScreenToWorldPoint(Input.mousePosition);
-            var hit = Physics2D.Raycast(mousePosition, Vector2.zero);
-            return hit.collider != null ? hit.collider.GetComponent<SpawnerController>() : false;
+            gridManager.CalculateSpiralGridPath(newCoordinate);
         }
+
+        private void OnAllItemsSpawnHandler()
+        {
+            _isSpawningButtonPressed = false;
+        }
+
+        private void StartStopSpawnerButtonHandler(bool state)
+        {
+            _isSpawningButtonPressed = state;
+        }
+
+        private void OnClearButtonPressedHandler()
+        {
+            gridManager.ClearNeighbouringColourCells();
+        }
+
+        #endregion
     }
 }
