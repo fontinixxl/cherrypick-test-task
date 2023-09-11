@@ -12,3 +12,6 @@ Author: Gerard Cuello Adell
 - Clearing the neighbouring cells that share the same colour:
   - DFS algorithm due to its simplicity, and its computational cost O(N).
   - Recursive version of the algorithm has been chosen due to being simpler and more intuitive, even at a cost of potential increased performance cost.
+
+## Architecture
+- New Input System to makes the code less cumbersome while adding support for mouse and touch.

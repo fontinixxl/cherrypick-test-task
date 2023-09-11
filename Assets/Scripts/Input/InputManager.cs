@@ -12,13 +12,15 @@ namespace Gerard.CherryPickGames.Input
         public event Action<Vector2, bool> CameraMoveEvent;
         private InputControls _inputControls;
 
-        private void Awake()
+        public override void Awake()
         {
             _inputControls = new InputControls();
             _inputControls.Camera.Pan.performed += ctx =>
             {
                 CameraMoveEvent?.Invoke(ctx.ReadValue<Vector2>(), ctx.control.device is Touchscreen);
             };
+
+            base.Awake();
         }
 
         private void OnEnable()

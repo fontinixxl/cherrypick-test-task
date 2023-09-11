@@ -3,13 +3,6 @@ using UnityEngine;
 
 namespace Gerard.CherrypickGames
 {
-    // Used to deserialize the json data
-    internal struct GridData
-    {
-        public int Width;
-        public int Height;
-    }
-
     public class GameManager : MonoBehaviour
     {
         [Header("Dependencies")]
@@ -17,24 +10,11 @@ namespace Gerard.CherrypickGames
         [SerializeField] private GridManager gridManager;
         [SerializeField] private CameraController cameraController;
         [Header("Data")]
-        [SerializeField] private GameObject spawnerPrefab;
+        [SerializeField] private SpawnerController spawnerPrefab;
 
         private SpawnerController _spawner;
         private bool _isDraggingSpawner;
-        private Coroutine _spawnCoroutine = null;
-
-        private void Start()
-        {
-            if (!LoadGridConfig(out var gridData)) return;
-        #if UNITY_ANDROID
-            // Force width and height to max 25x25 for performance reasons
-            gridData.Width = (int)Mathf.Clamp(gridData.Width, 2f, 25f);
-            gridData.Height = (int)Mathf.Clamp(gridData.Height, 2f, 25f);
-        #endif
-            gridManager.Initialize(gridData.Width, gridData.Height);
-            UpdateCameraZoomLimits(gridData);
-            SpawnSpawner();
-        }
+        private Coroutine _spawnCoroutine;
 
         private void OnEnable()
         {
@@ -48,6 +28,19 @@ namespace Gerard.CherrypickGames
             uiManager.ClearingButton.OnButtonStateChanged -= OnClearButtonPressedHandler;
         }
 
+        private void Start()
+        {
+            if (!LoadGridConfig(out var gridData)) return;
+        #if UNITY_ANDROID
+            // Force width and height to max 25x25 for performance reasons
+            gridData.Width = (int)Mathf.Clamp(gridData.Width, 2f, 75f);
+            gridData.Height = (int)Mathf.Clamp(gridData.Height, 2f, 75f);
+        #endif
+            gridManager.Initialize(gridData.Width, gridData.Height);
+            UpdateCameraZoomLimits(gridData);
+            SpawnSpawner();
+        }
+
         private void UpdateCameraZoomLimits(GridData gridData)
         {
             var gridWidth = gridData.Width * gridManager.CellSize;
@@ -59,9 +52,7 @@ namespace Gerard.CherrypickGames
         {
             var startingGridPosition = gridManager.GetCenterCoordinates();
             var worldPosition = gridManager.GetWorldPositionFromCell(startingGridPosition);
-            _spawner = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform)
-                .GetComponent<SpawnerController>();
-
+            _spawner = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform);
             // Inject dependencies to the SpawnController
             _spawner.Initialize(gridManager, cameraController.MainCamera, OnSpawnerMovedHandler);
         }
@@ -120,5 +111,12 @@ namespace Gerard.CherrypickGames
         }
 
         #endregion
+    }
+
+    // Used to deserialize the json data
+    internal struct GridData
+    {
+        public int Width;
+        public int Height;
     }
 }
