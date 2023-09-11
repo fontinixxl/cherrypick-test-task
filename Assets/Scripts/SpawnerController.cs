@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections;
+using Gerard.CherryPickGames.Input;
+using Gerard.CherryPickGames.UI;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 namespace Gerard.CherrypickGames
 {
+    [RequireComponent(typeof(ButtonPressRelease))]
     public class SpawnerController : MonoBehaviour
     {
         [SerializeField] private Item itemPrefab;
@@ -12,29 +15,51 @@ namespace Gerard.CherrypickGames
         private GridManager _gridManager;
         private bool _isDragging;
         private Camera _mainCamera;
-        private Collider2D _collider2D;
         private Vector3 _originalPositionBeforeDrag;
 
-        private Action _onAllItemsSpawned;
         private Action<Vector2Int> _onSpawnerMoved;
+        private ButtonPressRelease _draggable;
+        private InputManager _inputManger;
 
         private void Awake()
         {
-            _collider2D = GetComponent<Collider2D>();
+            _draggable = GetComponent<ButtonPressRelease>();
         }
 
-        public void Initialize(GridManager gridManager, Camera mainCamera, Action onAllItemsSpawned,
-            Action<Vector2Int> onSpawnerMoved)
+        private void OnEnable()
+        {
+            _draggable.OnButtonStateChanged += OnObjectInteraction;
+        }
+
+        private void Start()
+        {
+            _inputManger = InputManager.Instance;
+        }
+
+        private void Update()
+        {
+            if (!_isDragging) return;
+
+            var position = GetPointerInWorldPosition();
+            position.z = 0;
+            transform.position = position;
+        }
+
+        private void OnDisable()
+        {
+            _draggable.OnButtonStateChanged -= OnObjectInteraction;
+        }
+
+        public void Initialize(GridManager gridManager, Camera mainCamera, Action<Vector2Int> onSpawnerMoved)
         {
             _gridManager = gridManager;
             _mainCamera = mainCamera;
-            _onAllItemsSpawned = onAllItemsSpawned;
             _onSpawnerMoved = onSpawnerMoved;
         }
 
-        public void Spawn()
+        public IEnumerator SpawnCoroutine()
         {
-            if (_gridManager.OrderedStack == null) return;
+            if (_gridManager.OrderedStack == null) yield break;
 
             var possibleColors = _gridManager.PossibleColors;
             while (_gridManager.OrderedStack.Count > 0)
@@ -49,11 +74,9 @@ namespace Gerard.CherrypickGames
 
                     // Start animation towards target cell
                     StartCoroutine(MoveItemToTargetPosition(item.transform, targetPosition, .1f));
-                    return;
+                    yield return null;
                 }
             }
-
-            _onAllItemsSpawned.Invoke();
         }
 
         private IEnumerator MoveItemToTargetPosition(Transform itemTransform, Vector3 targetPosition, float duration)
@@ -72,39 +95,32 @@ namespace Gerard.CherrypickGames
             itemTransform.position = targetPosition; // ensure the item reaches the exact target position
         }
 
-        public bool IsMouseOverOrDragging()
+        private void OnObjectInteraction(bool isObjectSelected)
         {
-            var mouseWorldPosition = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
-            return _collider2D.OverlapPoint(mouseWorldPosition) || _isDragging;
-        }
-
-        public void HandleDrag()
-        {
-            var mouseWorldPosition = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
-            if (Input.GetMouseButtonDown(0))
+            if (isObjectSelected)
             {
                 _originalPositionBeforeDrag = transform.position;
+                _inputManger.EnableDraggingControls();
                 _isDragging = true;
             }
-
-            if (Input.GetMouseButtonUp(0) && _isDragging)
+            else
             {
-                if (SnapToCell(mouseWorldPosition, out var newGridPosition))
+                if (TrySnapToCell(GetPointerInWorldPosition(), out var newGridPosition))
                 {
                     _onSpawnerMoved?.Invoke(newGridPosition);
                 }
-
                 _isDragging = false;
-            }
-
-            if (_isDragging)
-            {
-                mouseWorldPosition.z = 0; // Ensure the z-position remains consistent
-                transform.position = mouseWorldPosition;
+                _inputManger.EnableCameraControls();
             }
         }
 
-        private bool SnapToCell(Vector3 mousePosition, out Vector2Int newGridPosition)
+        private Vector3 GetPointerInWorldPosition()
+        {
+            var currentPos = _inputManger.GetCurrentMouseOrTouchPosition();
+            return _mainCamera.ScreenToWorldPoint(currentPos);
+        }
+
+        private bool TrySnapToCell(Vector3 mousePosition, out Vector2Int newGridPosition)
         {
             var closestX = Mathf.RoundToInt(mousePosition.x + _gridManager.XOffset);
             var closestY =

@@ -20,45 +20,32 @@ namespace Gerard.CherrypickGames
         [SerializeField] private GameObject spawnerPrefab;
 
         private SpawnerController _spawner;
-        private bool _isSpawningButtonPressed;
-
-        private void OnEnable()
-        {
-            uiManager.SpawnButton.OnButtonStateChanged += StartStopSpawnerButtonHandler;
-            uiManager.ClearingButton.OnButtonPressed += OnClearButtonPressedHandler;
-        }
-
-        private void OnDisable()
-        {
-            uiManager.SpawnButton.OnButtonStateChanged -= StartStopSpawnerButtonHandler;
-            uiManager.ClearingButton.OnButtonPressed -= OnClearButtonPressedHandler;
-        }
+        private bool _isDraggingSpawner;
+        private Coroutine _spawnCoroutine = null;
 
         private void Start()
         {
             if (!LoadGridConfig(out var gridData)) return;
+        #if UNITY_ANDROID
+            // Force width and height to max 25x25 for performance reasons
+            gridData.Width = (int)Mathf.Clamp(gridData.Width, 2f, 25f);
+            gridData.Height = (int)Mathf.Clamp(gridData.Height, 2f, 25f);
+        #endif
             gridManager.Initialize(gridData.Width, gridData.Height);
             UpdateCameraZoomLimits(gridData);
             SpawnSpawner();
         }
 
-        private void Update()
+        private void OnEnable()
         {
-            if (_isSpawningButtonPressed)
-            {
-                _spawner.Spawn();
-                return;
-            }
+            uiManager.SpawnButton.OnButtonStateChanged += StartStopSpawnerButtonHandler;
+            uiManager.ClearingButton.OnButtonStateChanged += OnClearButtonPressedHandler;
+        }
 
-            // Spawner has movement priority whether the pointer is on the spawner or we are already dragging it
-            if (_spawner.IsMouseOverOrDragging())
-            {
-                _spawner.HandleDrag();
-            }
-            else
-            {
-                cameraController.HandleMovement();
-            }
+        private void OnDisable()
+        {
+            uiManager.SpawnButton.OnButtonStateChanged -= StartStopSpawnerButtonHandler;
+            uiManager.ClearingButton.OnButtonStateChanged -= OnClearButtonPressedHandler;
         }
 
         private void UpdateCameraZoomLimits(GridData gridData)
@@ -76,7 +63,7 @@ namespace Gerard.CherrypickGames
                 .GetComponent<SpawnerController>();
 
             // Inject dependencies to the SpawnController
-            _spawner.Initialize(gridManager, cameraController.MainCamera, OnAllItemsSpawnHandler, OnSpawnerMovedHandler);
+            _spawner.Initialize(gridManager, cameraController.MainCamera, OnSpawnerMovedHandler);
         }
 
         private bool LoadGridConfig(out GridData gridData)
@@ -88,8 +75,19 @@ namespace Gerard.CherrypickGames
                 Debug.LogError("gridConfig.json resource not found!");
                 return false;
             }
-
             gridData = JsonUtility.FromJson<GridData>(json.ToString());
+
+            if (gridData.Width != gridData.Height)
+            {
+                Debug.LogErrorFormat("Width and Height values must be equal");
+                return false;
+            }
+            if (gridData.Width < 2 || gridData.Height < 2)
+            {
+                Debug.LogErrorFormat($"Minimum grid size must be 2x2, current values are [{gridData.Width}, {gridData.Height}]");
+                return false;
+            }
+
             return true;
         }
 
@@ -100,17 +98,23 @@ namespace Gerard.CherrypickGames
             gridManager.CalculateSpiralGridPath(newCoordinate);
         }
 
-        private void OnAllItemsSpawnHandler()
+        private void StartStopSpawnerButtonHandler(bool isButtonPressed)
         {
-            _isSpawningButtonPressed = false;
+            if (isButtonPressed)
+            {
+                _spawnCoroutine ??= StartCoroutine(_spawner.SpawnCoroutine());
+            }
+            else
+            {
+                if (_spawnCoroutine != null)
+                {
+                    StopCoroutine(_spawnCoroutine);
+                    _spawnCoroutine = null;
+                }
+            }
         }
 
-        private void StartStopSpawnerButtonHandler(bool state)
-        {
-            _isSpawningButtonPressed = state;
-        }
-
-        private void OnClearButtonPressedHandler()
+        private void OnClearButtonPressedHandler(bool state)
         {
             gridManager.ClearNeighbouringColourCells();
         }

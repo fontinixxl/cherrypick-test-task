@@ -1,4 +1,5 @@
-﻿using Gerard.CherryPickGames.UI;
+﻿using Gerard.CherryPickGames.Input;
+using Gerard.CherryPickGames.UI;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,14 +14,24 @@ namespace Gerard.CherrypickGames
 
         private CameraPan _cameraPan;
         private Slider _zoomSlider;
-        
-        private readonly float _minZoom = 5f; 
+
+        private readonly float _minZoom = 5f;
         private readonly float _maxZoom = 20f;
-        
+
         private void Awake()
         {
             MainCamera = GetComponent<Camera>();
             _cameraPan = GetComponent<CameraPan>();
+        }
+
+        private void OnEnable()
+        {
+            InputManager.Instance.CameraMoveEvent += HandleMovement;
+        }
+
+        private void OnDisable()
+        {
+            InputManager.Instance.CameraMoveEvent -= HandleMovement;
         }
 
         private void Start()
@@ -36,7 +47,7 @@ namespace Gerard.CherrypickGames
         {
             MainCamera.orthographicSize = zoomValue;
         }
-        
+
         public void UpdateZoomLimits(float gridWidth, float gridHeight)
         {
             var desiredZoomForWidth = gridWidth / (2f * MainCamera.aspect);
@@ -54,10 +65,10 @@ namespace Gerard.CherrypickGames
             AdjustZoom(maxZoom);
         }
 
-        public void HandleMovement()
+        private void HandleMovement(Vector2 movement, bool isTouchScreen)
         {
-            if (uiManager.IsSliderBeingInteracted) return;
-            _cameraPan.HandleCameraMovement();
+            if (uiManager.IsUIBeingInteracted) return;
+            _cameraPan.HandleCameraMovement(movement, isTouchScreen);
         }
 
         public Camera MainCamera { get; private set; }
