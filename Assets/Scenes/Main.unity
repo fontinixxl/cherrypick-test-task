@@ -654,7 +654,7 @@ MonoBehaviour:
   minPanSpeed: 0.2
   maxPanSpeed: 1
   smoothFactor: 0.08
-  padding: 1
+  padding: 1.1
 --- !u!114 &519420035
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -708,7 +708,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0.18981479, y: 1}
-  m_AnchoredPosition: {x: 49.999943, y: 0}
+  m_AnchoredPosition: {x: 50, y: 0}
   m_SizeDelta: {x: 106.0149, y: 0}
   m_Pivot: {x: 0, y: 0.5}
 --- !u!114 &641631083
@@ -1117,7 +1117,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 11.59003, y: -12.199951}
+  m_AnchoredPosition: {x: 11.590088, y: -12.199951}
   m_SizeDelta: {x: 147.2953, y: 54.2813}
   m_Pivot: {x: 0, y: 1}
 --- !u!114 &1027926054
@@ -1676,6 +1676,7 @@ MonoBehaviour:
   uiManager: {fileID: 2115471911}
   gridManager: {fileID: 464851433}
   cameraController: {fileID: 519420034}
+  gridConfigFile: {fileID: 4900000, guid: 881c996d290f4ce481945e7a351c7d20, type: 3}
   spawnerPrefab: {fileID: 6167787286603808981, guid: 6f34232d7d345944ba49a3f30d6240a6, type: 3}
 --- !u!4 &2073465442
 Transform:

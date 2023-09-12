@@ -21,6 +21,15 @@ namespace Gerard.CherrypickGames
         private ButtonPressRelease _draggable;
         private InputManager _inputManger;
 
+        public Vector2Int CurrentGridPosition { get; private set; }
+
+        public void Initialize(GridManager gridManager, Camera mainCamera, Action<Vector2Int> onSpawnerMoved)
+        {
+            _gridManager = gridManager;
+            _mainCamera = mainCamera;
+            _onSpawnerMoved = onSpawnerMoved;
+        }
+
         private void Awake()
         {
             _draggable = GetComponent<ButtonPressRelease>();
@@ -28,7 +37,7 @@ namespace Gerard.CherrypickGames
 
         private void OnEnable()
         {
-            _draggable.OnButtonStateChanged += OnObjectInteraction;
+            _draggable.OnButtonStateChanged += OnObjectInteracted;
         }
 
         private void Start()
@@ -40,31 +49,24 @@ namespace Gerard.CherrypickGames
         {
             if (!_isDragging) return;
 
-            var position = GetPointerInWorldPosition();
+            var position = GetPositionWorldSpace();
             position.z = 0;
             transform.position = position;
         }
 
         private void OnDisable()
         {
-            _draggable.OnButtonStateChanged -= OnObjectInteraction;
-        }
-
-        public void Initialize(GridManager gridManager, Camera mainCamera, Action<Vector2Int> onSpawnerMoved)
-        {
-            _gridManager = gridManager;
-            _mainCamera = mainCamera;
-            _onSpawnerMoved = onSpawnerMoved;
+            _draggable.OnButtonStateChanged -= OnObjectInteracted;
         }
 
         public IEnumerator SpawnCoroutine()
         {
-            if (_gridManager.OrderedStack == null) yield break;
+            if (_gridManager.SpawningCoordinates == null) yield break;
 
             var possibleColors = _gridManager.PossibleColors;
-            while (_gridManager.OrderedStack.Count > 0)
+            while (_gridManager.SpawningCoordinates.Count > 0)
             {
-                var targetGridPosition = _gridManager.OrderedStack.Pop();
+                var targetGridPosition = _gridManager.SpawningCoordinates.Pop();
                 if (_gridManager.IsValidPosition(targetGridPosition))
                 {
                     var targetPosition = _gridManager.GetCell(targetGridPosition).transform.position;
@@ -95,7 +97,7 @@ namespace Gerard.CherrypickGames
             itemTransform.position = targetPosition; // ensure the item reaches the exact target position
         }
 
-        private void OnObjectInteraction(bool isObjectSelected)
+        private void OnObjectInteracted(bool isObjectSelected)
         {
             if (isObjectSelected)
             {
@@ -105,8 +107,9 @@ namespace Gerard.CherrypickGames
             }
             else
             {
-                if (TrySnapToCell(GetPointerInWorldPosition(), out var newGridPosition))
+                if (TrySnapToCell(GetPositionWorldSpace(), out var newGridPosition))
                 {
+                    CurrentGridPosition = newGridPosition;
                     _onSpawnerMoved?.Invoke(newGridPosition);
                 }
                 _isDragging = false;
@@ -114,7 +117,7 @@ namespace Gerard.CherrypickGames
             }
         }
 
-        private Vector3 GetPointerInWorldPosition()
+        private Vector3 GetPositionWorldSpace()
         {
             var currentPos = _inputManger.GetCurrentMouseOrTouchPosition();
             return _mainCamera.ScreenToWorldPoint(currentPos);

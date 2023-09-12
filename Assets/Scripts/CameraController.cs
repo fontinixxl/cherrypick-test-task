@@ -1,8 +1,6 @@
-﻿using System;
-using Gerard.CherryPickGames.Input;
+﻿using Gerard.CherryPickGames.Input;
 using Gerard.CherryPickGames.UI;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace Gerard.CherrypickGames
@@ -11,7 +9,6 @@ namespace Gerard.CherrypickGames
     public class CameraController : MonoBehaviour
     {
         [SerializeField] private UIManager uiManager;
-        [FormerlySerializedAs("panSpeed")]
         [Header("Camera Movement")]
         [SerializeField] private float minPanSpeed = 2.5f;
         [SerializeField] private float maxPanSpeed = 8f;

@@ -10,6 +10,7 @@ namespace Gerard.CherrypickGames
         [SerializeField] private GridManager gridManager;
         [SerializeField] private CameraController cameraController;
         [Header("Data")]
+        [SerializeField] private TextAsset gridConfigFile;
         [SerializeField] private SpawnerController spawnerPrefab;
 
         private SpawnerController _spawner;
@@ -19,23 +20,18 @@ namespace Gerard.CherrypickGames
         private void OnEnable()
         {
             uiManager.SpawnButton.OnButtonStateChanged += StartStopSpawnerButtonHandler;
-            uiManager.ClearingButton.OnButtonStateChanged += OnClearButtonPressedHandler;
+            uiManager.ClearingButton.OnButtonStateChanged += OnClearButtonPressed;
         }
 
         private void OnDisable()
         {
             uiManager.SpawnButton.OnButtonStateChanged -= StartStopSpawnerButtonHandler;
-            uiManager.ClearingButton.OnButtonStateChanged -= OnClearButtonPressedHandler;
+            uiManager.ClearingButton.OnButtonStateChanged -= OnClearButtonPressed;
         }
 
         private void Start()
         {
             if (!LoadGridConfig(out var gridData)) return;
-        #if UNITY_ANDROID
-            // Force width and height to max 25x25 for performance reasons
-            gridData.Width = (int)Mathf.Clamp(gridData.Width, 2f, 75f);
-            gridData.Height = (int)Mathf.Clamp(gridData.Height, 2f, 75f);
-        #endif
             gridManager.Initialize(gridData.Width, gridData.Height);
             UpdateCameraZoomLimits(gridData);
             SpawnSpawner();
@@ -53,40 +49,50 @@ namespace Gerard.CherrypickGames
             var startingGridPosition = gridManager.GetCenterCoordinates();
             var worldPosition = gridManager.GetWorldPositionFromCell(startingGridPosition);
             _spawner = Instantiate(spawnerPrefab, worldPosition, Quaternion.identity, transform);
-            // Inject dependencies to the SpawnController
-            _spawner.Initialize(gridManager, cameraController.MainCamera, OnSpawnerMovedHandler);
+            _spawner.Initialize(gridManager, cameraController.MainCamera, OnSpawnerChangedPosition);
         }
 
         private bool LoadGridConfig(out GridData gridData)
         {
+            var logMsg = $"Loading JSON config: ";
             gridData = default;
-            var json = Resources.Load<TextAsset>("gridConfig");
-            if (json == null)
+            if (gridConfigFile == null)
             {
-                Debug.LogError("gridConfig.json resource not found!");
+                Debug.LogError($"{logMsg} gridConfig.json resource not found!");
                 return false;
             }
-            gridData = JsonUtility.FromJson<GridData>(json.ToString());
+            gridData = JsonUtility.FromJson<GridData>(gridConfigFile.ToString());
 
             if (gridData.Width != gridData.Height)
             {
-                Debug.LogErrorFormat("Width and Height values must be equal");
+                Debug.LogErrorFormat($"{logMsg} Width and Height values must be equal");
                 return false;
             }
             if (gridData.Width < 2 || gridData.Height < 2)
             {
-                Debug.LogErrorFormat($"Minimum grid size must be 2x2, current values are [{gridData.Width}, {gridData.Height}]");
+                Debug.LogErrorFormat($"{logMsg} Minimum grid size must be 2x2, current values are [{gridData.Width}, {gridData.Height}]");
                 return false;
             }
 
+#if UNITY_ANDROID
+            // Force width and height to max 250x250 for performance reasons
+            gridData.Width = (int)Mathf.Clamp(gridData.Width, 2f, 250f);
+            gridData.Height = (int)Mathf.Clamp(gridData.Height, 2f, 250f);
+#endif
             return true;
         }
 
         #region Action Handlers
 
-        private void OnSpawnerMovedHandler(Vector2Int newCoordinate)
+        private void OnSpawnerChangedPosition(Vector2Int newCoordinate)
         {
-            gridManager.CalculateSpiralGridPath(newCoordinate);
+            gridManager.GenerateSpawningCoordinates(newCoordinate.x, newCoordinate.y);
+        }
+
+        private void OnClearButtonPressed(bool _)
+        {
+            gridManager.ClearNeighbouringColourCells();
+            gridManager.GenerateSpawningCoordinates(_spawner.CurrentGridPosition.x, _spawner.CurrentGridPosition.y);
         }
 
         private void StartStopSpawnerButtonHandler(bool isButtonPressed)
@@ -105,16 +111,11 @@ namespace Gerard.CherrypickGames
             }
         }
 
-        private void OnClearButtonPressedHandler(bool state)
-        {
-            gridManager.ClearNeighbouringColourCells();
-        }
-
         #endregion
     }
 
-    // Used to deserialize the json data
-    internal struct GridData
+    // Used to deserialize json data
+    public struct GridData
     {
         public int Width;
         public int Height;

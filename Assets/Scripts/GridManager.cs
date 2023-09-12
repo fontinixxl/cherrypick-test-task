@@ -11,17 +11,16 @@ namespace Gerard.CherrypickGames
         [SerializeField] private List<Color> possibleColors = new();
         [SerializeField] private int cellSize = 1;
 
-        private Vector2Int _startingGridPosition;
         private bool[,] _visitedCells;
 
         public void Initialize(int width, int height)
         {
             Width = width;
             Height = height;
-            OrderedStack = new Stack<Vector2Int>(Width * Height);
             _visitedCells = new bool[Width, Height];
             GenerateGrid();
-            CalculateSpiralGridPath(_startingGridPosition);
+            var newPosition = GetCenterCoordinates();
+            GenerateSpawningCoordinates(newPosition.x, newPosition.y);
         }
 
         private void GenerateGrid()
@@ -50,58 +49,70 @@ namespace Gerard.CherrypickGames
             transform.position = new Vector3(-XOffset, -YOffset, 0);
         }
 
-        // Based on the Width and Height of a two dimensional grid, this method will generate
-        // a Stack containing the grid coordinates in a clock wise pattern.
-        // Algorithm based on the following article:
-        // https://javaconceptoftheday.com/how-to-create-spiral-of-numbers-matrix-in-java/
-        public void CalculateSpiralGridPath(Vector2Int spawnerGridPosition)
+        public void GenerateSpawningCoordinates(int startX, int startY)
         {
-            OrderedStack.Clear();
+            var tmpStack = new Stack<Vector2Int>(Width * Height - 1);
 
-            var value = 1;
-            var minCol = 0;
-            var maxCol = Width - 1;
-            var minRow = 0;
-            var maxRow = Height - 1;
+            // Calculate virtual grid size
+            var maxRowDist = Mathf.Max(Height - startX, startX + 1);
+            var maxColDist = Mathf.Max(Width - startY, startY + 1);
+            var virtualSize = 2 * Mathf.Max(maxRowDist, maxColDist) - 1;
 
-            while (value <= Width * Height)
+            var visited = new bool[virtualSize, virtualSize];
+
+            var center = virtualSize / 2;
+            var offsetX = center - startX;
+            var offsetY = center - startY;
+
+            var virtualX = startX + offsetX;
+            var virtualY = startY + offsetY;
+
+            int[,] directions = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } };
+
+            var currentDir = 0;
+            var stepsInCurrentDirection = 1;
+            var directionChanges = 0;
+
+            while (tmpStack.Count < Height * Width)
             {
-                for (var i = minRow; i <= maxRow; i++)
+                for (var j = 0; j < stepsInCurrentDirection; j++)
                 {
-                    var gridPos = new Vector2Int(minCol, i);
-                    OrderedStack.Push(gridPos);
-                    value++;
+                    if (virtualX >= 0 && virtualX < virtualSize && virtualY >= 0 && virtualY < virtualSize &&
+                        !visited[virtualX, virtualY])
+                    {
+                        visited[virtualX, virtualY] = true;
+
+                        var mappedX = virtualX - offsetX;
+                        var mappedY = virtualY - offsetY;
+
+                        if (mappedX >= 0 && mappedX < Height && mappedY >= 0 && mappedY < Width)
+                        {
+                            tmpStack.Push(new Vector2Int(mappedX, mappedY));
+                        }
+
+                        virtualX += directions[currentDir, 0];
+                        virtualY += directions[currentDir, 1];
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                for (var i = minCol + 1; i <= maxCol; i++)
+                directionChanges++;
+                if (directionChanges == 2)
                 {
-                    var gridPos = new Vector2Int(i, maxRow);
-                    OrderedStack.Push(gridPos);
-                    value++;
+                    directionChanges = 0;
+                    stepsInCurrentDirection++;
                 }
 
-                for (var i = maxRow - 1; i >= minRow; i--)
-                {
-                    var gridPos = new Vector2Int(maxCol, i);
-                    OrderedStack.Push(gridPos);
-                    value++;
-                }
-
-                for (var i = maxCol - 1; i >= minCol + 1; i--)
-                {
-                    var gridPos = new Vector2Int(i, minRow);
-                    OrderedStack.Push(gridPos);
-                    value++;
-                }
-
-                minCol++;
-                minRow++;
-                maxCol--;
-                maxRow--;
+                currentDir = (currentDir + 1) % 4;
             }
 
-            // Discard the first one since it's where the spawner is
-            OrderedStack.Pop();
+            // Reverse Stack : https://rb.gy/py862
+            SpawningCoordinates = new Stack<Vector2Int>(tmpStack);
+            // Remove the starting cell since it is where the spawner is placed
+            SpawningCoordinates.Pop();
         }
 
         # region Clear_Neighbours
@@ -110,7 +121,6 @@ namespace Gerard.CherrypickGames
         {
             Array.Clear(_visitedCells, 0, _visitedCells.Length);
             ClearNeighbourCellsSameColor();
-            CalculateSpiralGridPath(_startingGridPosition);
         }
 
         private void ClearNeighbourCellsSameColor()
@@ -124,10 +134,9 @@ namespace Gerard.CherrypickGames
                         var cell = GetCell(new Vector2Int(x, y));
                         if (!_visitedCells[x, y] && !cell.IsEmpty && cell.ItemColor == color)
                         {
-                            List<Cell> sameColoredCells = new List<Cell>();
+                            var sameColoredCells = new List<Cell>();
                             DFS(cell.GridPosition, color, sameColoredCells);
 
-                            // Clear if 2 or more
                             if (sameColoredCells.Count >= 2)
                             {
                                 foreach (var sameColorCell in sameColoredCells)
@@ -207,11 +216,11 @@ namespace Gerard.CherrypickGames
         #region Autoproperties
 
         private Cell[,] Cells { get; set; }
+        public Stack<Vector2Int> SpawningCoordinates { get; private set; }
         public float XOffset { get; private set; }
         public float YOffset { get; private set; }
         public int Width { get; private set; }
         public int Height { get; private set; }
-        public Stack<Vector2Int> OrderedStack { get; private set; }
         public List<Color> PossibleColors => possibleColors;
         public int CellSize => cellSize;
 
