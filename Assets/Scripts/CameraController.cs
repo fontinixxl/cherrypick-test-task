@@ -8,6 +8,8 @@ namespace Gerard.CherrypickGames
     [RequireComponent(typeof(Camera))]
     public class CameraController : MonoBehaviour
     {
+        private const float MIN_ZOOM_THRESHOLD = 3.5f;
+
         [SerializeField] private UIManager uiManager;
         [Header("Camera Movement")]
         [SerializeField] private float minPanSpeed = 2.5f;
@@ -16,7 +18,6 @@ namespace Gerard.CherrypickGames
         [Header("Zoom")]
         [SerializeField] private float padding;
 
-        private float _minZoom = 5f;
         private float _maxZoom = 20f;
 
         private Slider _zoomSlider;
@@ -43,9 +44,6 @@ namespace Gerard.CherrypickGames
         private void Start()
         {
             _zoomSlider = uiManager.ZoomSlider;
-            _zoomSlider.minValue = _minZoom;
-            _zoomSlider.maxValue = _maxZoom;
-            _zoomSlider.value = MainCamera.orthographicSize;
             _zoomSlider.onValueChanged.AddListener(AdjustZoom);
         }
 
@@ -58,7 +56,7 @@ namespace Gerard.CherrypickGames
                 movement *= 0.1f;
             }
 
-            var speedFactor = Mathf.InverseLerp(_minZoom, _maxZoom, MainCamera.orthographicSize);
+            var speedFactor = Mathf.InverseLerp(MIN_ZOOM_THRESHOLD, _maxZoom, MainCamera.orthographicSize);
             var adjustedSpeed = Mathf.Lerp(minPanSpeed, maxPanSpeed, speedFactor);
 
             var delta = new Vector3(movement.x, movement.y, 0);
@@ -81,11 +79,6 @@ namespace Gerard.CherrypickGames
             }
         }
 
-        private void AdjustZoom(float zoomValue)
-        {
-            MainCamera.orthographicSize = zoomValue;
-        }
-
         public void UpdateZoomLimits(float gridWidth, float gridHeight)
         {
             var desiredZoomForWidth = gridWidth / (2f * MainCamera.aspect);
@@ -94,13 +87,15 @@ namespace Gerard.CherrypickGames
             // Set the max zoom to whichever dimension is larger
             _maxZoom = Mathf.Max(desiredZoomForWidth, desiredZoomForHeight) * padding;
 
-            // Optionally, set a minimum zoom - here, I'm setting it to show at least 4 rows or columns
-            _minZoom = Mathf.Min(gridWidth / 4f / MainCamera.aspect, gridHeight / 4f);
-
-            _zoomSlider.minValue = _minZoom;
+            _zoomSlider.minValue = MIN_ZOOM_THRESHOLD;
             _zoomSlider.maxValue = _maxZoom;
             _zoomSlider.value = _maxZoom;
             AdjustZoom(_maxZoom);
+        }
+
+        private void AdjustZoom(float zoomValue)
+        {
+            MainCamera.orthographicSize = zoomValue;
         }
 
         public Camera MainCamera { get; private set; }
