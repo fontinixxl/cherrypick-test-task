@@ -5,7 +5,6 @@ This project contains the implementation of a a test task for a Senior Unity Dev
 ## Gameplay Footage (Solution)
 ![alt text](Recordings/gameplay.gif)
 
-z
 ## Task description
 
 We would like to ask you to implement a grid-based game. It will not have a win or lose
